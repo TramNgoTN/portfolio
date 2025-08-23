@@ -1,0 +1,180 @@
+--1.Data starting
+SELECT *
+FROM dbo.CovidDeaths
+WHERE continent IS NOT NULL
+ORDER BY 3,4
+
+
+--2.Total Cases and Total Deaths
+--Likelihood of dying from Covid in the US
+SELECT
+	[location], 
+	[date], 
+	total_cases AS [Total Cases], 
+	total_deaths AS [Total Deaths], 
+	total_deaths/total_cases AS DeathPercentage
+FROM dbo.CovidDeaths
+WHERE
+	location LIKE n'%states%'
+	AND [location] IS NOT NULL
+ORDER BY 1,2
+
+
+--3.Total Cases and Population
+--The Covid infection rate
+SELECT
+	[location], 
+	[date], 
+	total_cases AS [Total Cases], 
+	[population] AS [Population], 
+	total_cases/[population]*100 AS InfectionRateAsPercentage
+FROM dbo.CovidDeaths
+WHERE 
+	--[location] LIKE '%states%' AND
+	total_cases IS NOT NULL
+	AND [population] IS NOT NULL
+ORDER BY 1,2
+
+
+--4.Country with highest Infection Rate compared to Population
+SELECT
+	[location], 
+	MAX(total_cases) AS [Total Cases], 
+	[population] AS [Population],
+    MAX(Total_cases)/[population]*100 AS CasePercentage
+FROM dbo.CovidDeaths
+WHERE 
+    --[location] like n'%states%' AND
+    total_cases IS NOT NULL
+    AND [population] IS NOT NULL
+GROUP BY [location], [population]
+ORDER BY CasePercentage DESC
+
+
+--5.Top 10 Countries with highest Death Count
+SELECT TOP 10
+	[location], 
+	MAX(total_deaths) AS [Total Deaths]    
+FROM dbo.CovidDeaths
+WHERE 
+    --[location] like n'%states%' AND
+    total_cases IS NOT NULL
+    AND [population] IS NOT NULL
+GROUP BY [location]
+ORDER BY MAX(total_deaths) DESC
+
+
+--6.BREAKING DOWN BY CONTINENTS
+--Continents with the highest death count
+SELECT 
+    continent,
+	MAX(total_deaths) AS [Total Deaths]    
+FROM dbo.CovidDeaths
+WHERE 
+    --[location] like n'%states%' AND
+    total_deaths IS NOT NULL
+    AND continent IS NOT NULL
+GROUP BY (continent)
+ORDER BY MAX(total_deaths) DESC
+
+
+--7.Global numbers
+SELECT 
+    continent AS [Continent],
+    SUM(new_cases) AS [Total cases],
+    SUM(new_deaths) AS [Total deaths],
+    SUM(new_deaths)/SUM(new_cases)*100 as [Death Percentage]   
+FROM dbo.CovidDeaths
+WHERE 
+    new_cases IS NOT NULL AND new_cases != 0 AND
+    new_deaths IS NOT NULL AND new_deaths != 0 AND
+    continent IS NOT NULL
+GROUP BY continent
+ORDER BY 4 DESC
+
+
+--8.Total Population and Vaccinations
+--Show Percentage of Population that has received at least one Covid vaccine
+SELECT
+    cd.continent AS [Continent],
+    cd.location AS [Location],
+    cd.population AS [Population],
+    cv.new_vaccinations AS [New Vaccinations],
+	--as we already use PARTITION BY, we dont have to SUM in SELECT
+	SUM(cv.new_vaccinations) OVER (PARTITION BY cv.location ORDER BY cd.location, cd.date) AS [Sum of Vaccinations] 
+FROM dbo.CovidDeaths AS cd
+    JOIN dbo.CovidVaccinations AS cv
+    ON  cd.location = cv.location AND cd.date = cv.date 
+WHERE 
+    cd.[continent] IS NOT NULL
+   AND cd.[location] IS NOT NULL
+   AND new_vaccinations IS NOT NULL
+ORDER BY 1,2,5
+ 
+
+ --9.Use CTE to perform calculation on Partition By in previous Query
+WITH PopVsVac --named it then column names will align with the select parts
+(
+	[Continent],
+    [Location],
+    [Population],
+    [New Vaccinations],
+	[Sum of Vaccinations] 
+)
+AS --filling the CTEs
+(
+SELECT 
+    cd.continent, 
+    cd.location, 
+    cd.population, 
+    cv.new_vaccinations,
+    SUM(cv.new_vaccinations) OVER (PARTITION BY cv.location ORDER BY cd.location, cd.date) AS [Sum of Vaccinations] 
+
+FROM dbo.CovidDeaths AS cd
+    JOIN dbo.CovidVaccinations AS cv
+    ON  cd.location = cv.location AND cd.date = cv.date 
+WHERE 
+    cd.[continent] IS NOT NULL
+    AND cd.[location] IS NOT NULL
+    AND new_vaccinations IS NOT NULL                                  
+)
+
+--give the results
+SELECT *, [Sum of Vaccinations]/Population*100 AS VaccinatedPercent
+FROM PopVsVac
+
+
+--10.Creating View to store data for later visualizations
+CREATE VIEW PerctPopulationVaccinated AS
+SELECT
+    cd.continent, 
+    cd.location, 
+    cd.population, 
+    cv.new_vaccinations,
+    SUM(cv.new_vaccinations) OVER (PARTITION BY cv.location ORDER BY cd.location, cd.date) AS [Sum of Vaccinations] 
+
+FROM dbo.CovidDeaths AS cd
+    JOIN dbo.CovidVaccinations AS cv
+    ON  cd.location = cv.location AND cd.date = cv.date 
+WHERE 
+    cd.[continent] IS NOT NULL
+    AND cd.[location] IS NOT NULL
+    AND new_vaccinations IS NOT NULL   
+
+
+--11.Creating View to store data for later visualizations
+CREATE VIEW PerctPopulationVaccinated AS
+SELECT
+    cd.continent, 
+    cd.location, 
+    cd.population, 
+    cv.new_vaccinations,
+    SUM(cv.new_vaccinations) OVER (PARTITION BY cv.location ORDER BY cd.location, cd.date) AS [Sum of Vaccinations] 
+
+FROM dbo.CovidDeaths AS cd
+    JOIN dbo.CovidVaccinations AS cv
+    ON  cd.location = cv.location AND cd.date = cv.date 
+WHERE 
+    cd.[continent] IS NOT NULL
+    AND cd.[location] IS NOT NULL
+    AND new_vaccinations IS NOT NULL     
