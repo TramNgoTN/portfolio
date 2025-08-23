@@ -1,0 +1,107 @@
+--1.Standardize Date Format
+SELECT SaleDate, CONVERT(Date, SaleDate)
+FROM dbo.Nashville_Housing_Data
+
+UPDATE dbo.Nashville_Housing_Data
+SET SaleDate = CONVERT(Date, SaleDate)
+
+
+--2.Populate Property Address data
+
+SELECT
+    a.ParcelID, a.PropertyAddress, b.ParcelID, b.PropertyAddress, ISNULL(a.PropertyAddress, b.PropertyAddress)
+--self JOIN by borrow PropertyAddress from other rows with same ParcelID, dif UniqueID
+FROM dbo.Nashville_Housing_Data AS a --contain NULL rows
+    JOIN dbo.Nashville_Housing_Data AS b --contain non-null rows
+    ON a.ParcelID = b.ParcelID
+    AND a.UniqueID <> b.UniqueID
+WHERE a.PropertyAddress IS NULL 
+
+UPDATE a
+SET PropertyAddress = ISNULL(a.PropertyAddress, b.PropertyAddress)
+FROM dbo.Nashville_Housing_Data AS a
+    JOIN dbo.Nashville_Housing_Data AS b
+    ON a.ParcelID = b.ParcelID
+
+
+--3.Breaking out Address into Individual Columns (Address, City, State
+
+--get rid of the comma using queries
+SELECT --(the location, the first value location, the number of characters included)
+	SUBSTRING(PropertyAddress, 1, CHARINDEX(',', PropertyAddress)-1) AS Street,
+	SUBSTRING(PropertyAddress, CHARINDEX(',', PropertyAddress)+1, LEN(PropertyAddress)) AS City
+FROM dbo.Nashville_Housing_Data
+
+--add col to the TABLE
+ALTER TABLE Nashville_Housing_Data
+ADD PropertyStreet varchar(100);
+
+UPDATE Nashville_Housing_Data
+SET PropertyStreet = SUBSTRING(PropertyAddress, 1, CHARINDEX(',', PropertyAddress)-1)  
+
+ALTER TABLE Nashville_Housing_Data
+ADD PropertyCity varchar(100);
+
+UPDATE Nashville_Housing_Data
+SET PropertyCity = SUBSTRING(PropertyAddress, CHARINDEX(',', PropertyAddress)+1, LEN(PropertyAddress))
+    AND a.UniqueID <> b.UniqueID
+WHERE a.PropertyAddress IS NULL 
+
+
+--4.OwnerAddress Modifying
+SELECT 
+	PARSENAME(REPLACE(OwnerAddress,',','.'),3) AS Street, --sep by '.' backward
+	PARSENAME(REPLACE(OwnerAddress,',','.'),1) AS City, 
+	PARSENAME(REPLACE(OwnerAddress,',','.'),1) AS State
+FROM dbo.Nashville_Housing_Data
+
+
+ALTER TABLE Nashville_Housing_Data
+ADD OwnerStreet varchar(100);
+
+UPDATE Nashville_Housing_Data
+SET OwnerStreet = PARSENAME(REPLACE(OwnerAddress,',','.'),3)
+
+ALTER TABLE Nashville_Housing_Data
+ADD OwnerCity varchar(100);
+
+UPDATE Nashville_Housing_Data
+SET OwnerCity = PARSENAME(REPLACE(OwnerAddress,',','.'),2)
+
+ALTER TABLE Nashville_Housing_Data
+ADD OwnerState varchar(100);
+
+UPDATE Nashville_Housing_Data
+SET OwnerState = PARSENAME(REPLACE(OwnerAddress,',','.'),1)
+
+
+--5.Change Y/N to Yes/NO in [Sold as Vacant]
+UPDATE dbo.Nashville_Housing_Data
+SET [SoldAsVacant] =
+    CASE 
+        WHEN [SoldAsVacant] ='Y' THEN 'Yes'
+        WHEN [SoldAsVacant]= 'N'THEN 'No'
+        ELSE [SoldAsVacant]
+    END;
+
+
+--6.Remove duplication
+--Use window function
+
+WITH CTE5 AS( --cannot use WHERE inside a window func
+SELECT *,
+    Row_Number() OVER --count the dup row number
+    (PARTITION BY ParcelID, SaleDate, SalePrice, LegalReference
+    ORDER BY UniqueID) AS Row_dup
+FROM dbo.Nashville_Housing_Data
+)
+
+DELETE
+FROM CTE5
+WHERE Row_dup >1
+
+
+--7.Delete unused cols
+
+ALTER TABLE dbo.Nashville_Housing_Data
+DROP COLUMN OwnerAddress, TaxDistrict, PropertyAddress, SaleDate
