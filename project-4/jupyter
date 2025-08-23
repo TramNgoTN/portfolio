@@ -1,0 +1,116 @@
+#1.Import lib
+
+import pandas as pd #tables, csvs, excel
+import seaborn as sns
+import numpy as np
+
+import matplotlib
+import matplotlib.pyplot as plt
+plt.style.use('ggplot') #style
+from matplotlib.pyplot import figure
+
+%matplotlib inline
+matplotlib.rcParams['figure.figsize'] = (12,8) #config of the plots
+
+#Read data
+df = pd.read_csv(r'C:\Users\PC\Downloads\movies.csv')
+
+
+#2.Data cleaning
+
+#missing data
+for col in df.columns:
+    percent_missing = np.mean(df[col].isnull())
+    print('{} - {:.3f}%'.format(col, percent_missing))
+
+#data types
+df.dtypes
+
+#replace missing with 0
+df['budget'] = df['budget'].fillna(0).astype('int64')
+df['gross'] = df['gross'].fillna(0).astype('int64')
+
+df.head()
+
+#sorting by gross 
+df.sort_values(by=['gross'], inplace=False, ascending=False)
+
+pd.set_option('display.max_rows', None)
+
+#delete duplicates
+df.head().drop_duplicates()
+
+#3.Assumption 1: positive correlation
+#'gross' and 'budget'
+
+#scatter plot budget vs gross
+plt.scatter(x=df['budget'], y=df['gross']) 
+plt.title('Budget vs Gross Earnings')
+plt.xlabel('Gross Earnings')
+plt.ylabel('Budget')
+plt.show()
+
+df.head()
+
+#plot budget vs gross using seaborn
+sns.regplot(x='budget', y='gross', data=df)
+
+#correlation
+df.corr(numeric_only=True)
+
+#high correlation btw budget and gross
+#true assumption
+
+#4.Assumption 2: positive correlation
+#'gross' and 'company'
+
+#heatmap of numeric categories
+correlation_matrix=df.corr(numeric_only=True, method='pearson')
+sns.heatmap(correlation_matrix, annot=True)
+
+plt.title('Correlation Matrix for Numeric Features')
+plt.xlabel('Movie Features')
+plt.ylabel('Movie Features')
+
+plt.show()
+
+#numerized non-numeric cols
+df_numerized = df
+
+for col_name in df_numerized.columns:
+    if (df_numerized[col_name].dtype == 'object'):
+        df_numerized[col_name] = df_numerized[col_name].astype('category')
+        df_numerized[col_name] = df_numerized[col_name].cat.codes
+
+df_numerized
+
+#heatmap of numeric and non-numeric categories
+correlation_matrix = df_numerized.corr(numeric_only=True, method='pearson')
+sns.heatmap(correlation_matrix, annot=True)
+
+plt.title('Correlation Matrix for Numeric Features')
+plt.xlabel('Movie Features')
+plt.ylabel('Movie Features')
+
+plt.show()
+
+df_numerized.corr()
+
+#corr in pairs
+correlation_mat = df_numerized.corr()
+
+corr_pairs = correlation_mat.unstack()
+
+pd.set_option("display.max_rows", None)
+pd.set_option("display.max_columns", None)
+
+corr_pairs
+
+#check high correlation pairs
+high_corr = sorted_pairs[(sorted_pairs) > 0.5]
+high_corr
+
+# Votes and Budget have the highest correlation to Gross
+
+# Company correlation with Gross was insignificant
+# Wrong assumption
