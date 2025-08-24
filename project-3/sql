@@ -24,7 +24,7 @@ FROM dbo.Nashville_Housing_Data AS a
     ON a.ParcelID = b.ParcelID
 
 
---3.Breaking out Address into Individual Columns (Address, City, State
+--3.Breaking out Address into Individual Columns (Address, City, State)
 
 --get rid of the comma using queries
 SELECT --(the location, the first value location, the number of characters included)
